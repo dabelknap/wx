@@ -1,5 +1,6 @@
 use crossterm::event::{self, Event, KeyCode};
 use std::io;
+use std::{time::Duration, time::Instant};
 use tui::{
     backend::Backend,
     layout::{Alignment, Constraint, Direction, Layout},
@@ -20,18 +21,27 @@ const MISSING: &str = "--";
 
 pub fn run_app<B: Backend>(
     terminal: &mut Terminal<B>,
-    current: &observation::Observation,
-    station: &station::Station,
-    alerts: &alerts::Alerts,
-    forecast: &forecast::Forecast,
+    get_data: fn() -> (
+        observation::Observation,
+        station::Station,
+        alerts::Alerts,
+        forecast::Forecast,
+    ),
 ) -> io::Result<()> {
+    let (mut observation, mut station, mut alerts, mut forecast) = get_data();
+    let mut last_tick = Instant::now();
     loop {
-        terminal.draw(|f| ui(f, &current, &station, &alerts, &forecast))?;
+        terminal.draw(|f| ui(f, &observation, &station, &alerts, &forecast))?;
 
         if let Event::Key(key) = event::read()? {
             if let KeyCode::Char('q') = key.code {
                 return Ok(());
             }
+        }
+
+        if last_tick.elapsed() >= Duration::from_millis(1000) {
+            last_tick = Instant::now();
+            (observation, station, alerts, forecast) = get_data();
         }
     }
 }
@@ -125,6 +135,8 @@ fn display_current_conditions(current: &observation::Properties) -> Table {
         .border_type(BorderType::Rounded);
 
     let mut rows = vec![];
+    rows.push(Row::new(vec![Cell::from("")]));
+
     let temp = if let Some(temp) = current.temperature.value {
         format!("{temp:.1} C")
     } else {
@@ -181,7 +193,10 @@ fn display_headline<'a>(
     Paragraph::new(vec![
         Spans::from(vec![
             Span::raw(" "),
-            Span::styled(station.station_identifier.clone(), Style::default().fg(Color::Blue)),
+            Span::styled(
+                station.station_identifier.clone(),
+                Style::default().fg(Color::Blue),
+            ),
             Span::raw(" : "),
             Span::styled(station.name.clone(), Style::default().fg(Color::Yellow)),
         ]),
@@ -236,7 +251,7 @@ fn ui<B: Backend>(
 
     let mut list_items = vec![];
     if alerts.features.is_empty() {
-        list_items.push(ListItem::new("\n None"));
+        list_items.push(ListItem::new(format!("\n  {MISSING}")));
     } else {
         for alert in &alerts.features {
             list_items.push(ListItem::new(display_alert(&alert)));

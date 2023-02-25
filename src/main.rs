@@ -17,6 +17,15 @@ use crate::noaa::{alerts::Alerts, forecast::Forecast, observation::Observation, 
 
 const STATION: &str = "KMSN";
 
+fn get_weather_data() -> (Observation, Station, Alerts, Forecast) {
+    (
+        Observation::from_station(STATION).unwrap(),
+        Station::from_station(STATION).unwrap(),
+        Alerts::from_noaa().unwrap(),
+        Forecast::from_noaa().unwrap(),
+    )
+}
+
 fn main() -> Result<(), Box<dyn Error>> {
     // setup terminal
     enable_raw_mode()?;
@@ -25,13 +34,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
 
-    let observation = Observation::from_station(STATION).unwrap();
-    let station = Station::from_station(STATION).unwrap();
-    let alerts = Alerts::from_noaa().unwrap();
-    let forecast = Forecast::from_noaa().unwrap();
-
     // create app and run it
-    let res = run_app(&mut terminal, &observation, &station, &alerts, &forecast);
+    let res = run_app(&mut terminal, get_weather_data);
 
     // restore terminal
     disable_raw_mode()?;
