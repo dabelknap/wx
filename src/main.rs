@@ -19,10 +19,10 @@ const STATION: &str = "KMSN";
 
 fn get_weather_data() -> (Observation, Station, Alerts, Forecast) {
     (
-        Observation::from_station(STATION).unwrap(),
-        Station::from_station(STATION).unwrap(),
-        Alerts::from_noaa().unwrap(),
-        Forecast::from_noaa().unwrap(),
+        Observation::from_station(STATION).unwrap_or_default(),
+        Station::from_station(STATION).unwrap_or_default(),
+        Alerts::from_noaa().unwrap_or_default(),
+        Forecast::from_noaa().unwrap_or_default(),
     )
 }
 

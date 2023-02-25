@@ -1,12 +1,14 @@
 use reqwest::blocking::{Client, Response};
 use serde::Deserialize;
+use std::default::Default;
+use chrono::{DateTime, Local};
 
 const BASE_URL: &str = "https://api.weather.gov/";
 
 pub mod station {
     use super::*;
 
-    #[derive(Deserialize, Debug)]
+    #[derive(Deserialize, Debug, Default)]
     pub struct Station {
         pub properties: Properties,
     }
@@ -25,12 +27,22 @@ pub mod station {
         #[serde(rename = "stationIdentifier")]
         pub station_identifier: String,
     }
+
+    impl Default for Properties {
+        fn default() -> Self {
+            Self {
+                name: "--".to_string(),
+                forecast: "--".to_string(),
+                station_identifier: "--".to_string(),
+            }
+        }
+    }
 }
 
 pub mod observation {
     use super::*;
 
-    #[derive(Deserialize, Debug)]
+    #[derive(Deserialize, Debug, Default)]
     pub struct Observation {
         pub properties: Properties,
     }
@@ -56,16 +68,36 @@ pub mod observation {
         pub relative_humidity: Value<Option<f32>>,
     }
 
+    impl Default for Properties {
+        fn default() -> Self {
+            let now: DateTime<Local> = Local::now();
+            Self {
+                description: "--".to_string(),
+                timestamp: now.to_rfc3339(),
+                temperature: Value::new(None),
+                wind_direction: Value::new(None),
+                wind_speed: Value::new(None),
+                relative_humidity: Value::new(None),
+            }
+        }
+    }
+
     #[derive(Deserialize, Debug)]
     pub struct Value<T> {
         pub value: T,
+    }
+
+    impl<T> Value<T> {
+        fn new(value: T) -> Self {
+            Self { value }
+        }
     }
 }
 
 pub mod forecast {
     use super::*;
 
-    #[derive(Deserialize, Debug)]
+    #[derive(Deserialize, Debug, Default)]
     pub struct Forecast {
         pub properties: Properties,
     }
@@ -77,7 +109,7 @@ pub mod forecast {
         }
     }
 
-    #[derive(Deserialize, Debug)]
+    #[derive(Deserialize, Debug, Default)]
     pub struct Properties {
         pub periods: Vec<Results>,
     }
@@ -96,7 +128,7 @@ pub mod forecast {
 pub mod alerts {
     use super::*;
 
-    #[derive(Deserialize, Debug)]
+    #[derive(Deserialize, Debug, Default)]
     pub struct Alerts {
         pub title: String,
         pub updated: String,
