@@ -14,6 +14,9 @@ use crate::noaa::alerts;
 use crate::noaa::forecast;
 use crate::noaa::observation;
 use crate::noaa::station;
+use crate::units::direction::degree_to_compass;
+use crate::units::speed::kph2mph;
+use crate::units::temperature::c2f;
 
 use chrono::{DateTime, Local};
 
@@ -138,7 +141,8 @@ fn display_current_conditions(current: &observation::Properties) -> Table {
     rows.push(Row::new(vec![Cell::from("")]));
 
     let temp = if let Some(temp) = current.temperature.value {
-        format!("{temp:.1} C")
+        let temp = c2f(temp);
+        format!("{temp:.1} F")
     } else {
         MISSING.to_string()
     };
@@ -150,7 +154,9 @@ fn display_current_conditions(current: &observation::Properties) -> Table {
     let wind = if let (Some(speed), Some(dir)) =
         (current.wind_speed.value, current.wind_direction.value)
     {
-        format!("{speed:.1} KPH ({dir:.0}°)")
+        let speed = kph2mph(speed);
+        let compass = degree_to_compass(dir);
+        format!("{speed:.1} MPH ({compass})")
     } else {
         MISSING.to_string()
     };

@@ -1,7 +1,7 @@
+use chrono::{DateTime, Local};
 use reqwest::blocking::{Client, Response};
 use serde::Deserialize;
 use std::default::Default;
-use chrono::{DateTime, Local};
 
 const BASE_URL: &str = "https://api.weather.gov/";
 

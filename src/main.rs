@@ -10,6 +10,7 @@ use tui::{backend::CrosstermBackend, Terminal};
 
 mod app;
 mod noaa;
+mod units;
 
 use crate::app::run_app;
 
