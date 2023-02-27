@@ -60,6 +60,8 @@ pub mod observation {
         pub description: String,
         pub timestamp: String,
         pub temperature: Value<Option<f32>>,
+        #[serde(rename = "windChill")]
+        pub wind_chill: Value<Option<f32>>,
         #[serde(rename = "windDirection")]
         pub wind_direction: Value<Option<f32>>,
         #[serde(rename = "windSpeed")]
@@ -75,6 +77,7 @@ pub mod observation {
                 description: "--".to_string(),
                 timestamp: now.to_rfc3339(),
                 temperature: Value::new(None),
+                wind_chill: Value::new(None),
                 wind_direction: Value::new(None),
                 wind_speed: Value::new(None),
                 relative_humidity: Value::new(None),

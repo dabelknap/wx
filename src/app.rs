@@ -165,6 +165,17 @@ fn display_current_conditions(current: &observation::Properties) -> Table {
         Cell::from(wind).style(Style::default().fg(Color::Green)),
     ]));
 
+    let wind_chill = if let Some(wind_chill) = current.wind_chill.value {
+        let wind_chill = c2f(wind_chill);
+        format!("{wind_chill:.1} F")
+    } else {
+        MISSING.to_string()
+    };
+    rows.push(Row::new(vec![
+        Cell::from(" Wind Chill"),
+        Cell::from(wind_chill).style(Style::default().fg(Color::Green)),
+    ]));
+
     let humid = if let Some(humid) = current.relative_humidity.value {
         format!("{humid:.0}%")
     } else {
