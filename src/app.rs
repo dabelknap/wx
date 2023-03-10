@@ -90,6 +90,10 @@ fn display_forecast(conditions: &forecast::Results) -> Vec<Spans> {
 }
 
 fn display_alert(alert: &alerts::Feature) -> Vec<Spans> {
+    let onset: DateTime<Local> =
+        DateTime::from(DateTime::parse_from_rfc3339(&alert.properties.onset).unwrap());
+    let ends: DateTime<Local> =
+        DateTime::from(DateTime::parse_from_rfc3339(&alert.properties.ends).unwrap());
     vec![
         Spans::from(""),
         Spans::from(vec![
@@ -116,12 +120,18 @@ fn display_alert(alert: &alerts::Feature) -> Vec<Spans> {
         Spans::from(vec![
             Span::raw(" "),
             Span::raw(format!("{:10}", "Onset")),
-            Span::styled(&alert.properties.onset, Style::default().fg(Color::Green)),
+            Span::styled(
+                format!("{}", onset.format("%d-%m-%Y %H:%M")),
+                Style::default().fg(Color::Green),
+            ),
         ]),
         Spans::from(vec![
             Span::raw(" "),
             Span::raw(format!("{:10}", "Ends")),
-            Span::styled(&alert.properties.ends, Style::default().fg(Color::Green)),
+            Span::styled(
+                format!("{}", ends.format("%d-%m-%Y %H:%M")),
+                Style::default().fg(Color::Green),
+            ),
         ]),
     ]
 }
@@ -198,7 +208,7 @@ fn display_current_conditions(current: &observation::Properties) -> Table {
 
     Table::new(rows)
         .block(current_block)
-        .widths(&[Constraint::Length(12), Constraint::Length(15)])
+        .widths(&[Constraint::Length(12), Constraint::Length(25)])
 }
 
 fn display_headline<'a>(
