@@ -1,6 +1,6 @@
 use crossterm::event::{self, Event, KeyCode};
 use std::io;
-use std::{time::Duration, time::Instant};
+use std::time::Duration;
 use tui::{
     backend::Backend,
     layout::{Alignment, Constraint, Direction, Layout},
@@ -17,36 +17,77 @@ use crate::noaa::station;
 use crate::units::direction::degree_to_compass;
 use crate::units::speed::kph2mph;
 use crate::units::temperature::c2f;
+use std::sync::{mpsc, mpsc::Receiver, Arc, RwLock};
+use std::thread;
 
 use chrono::{DateTime, Local};
 
 const MISSING: &str = "--";
 
+type WeatherData = (
+    observation::Observation,
+    station::Station,
+    alerts::Alerts,
+    forecast::Forecast,
+);
+
 pub fn run_app<B: Backend>(
     terminal: &mut Terminal<B>,
-    get_data: fn() -> (
-        observation::Observation,
-        station::Station,
-        alerts::Alerts,
-        forecast::Forecast,
-    ),
+    get_data: fn() -> WeatherData,
 ) -> io::Result<()> {
-    let (mut observation, mut station, mut alerts, mut forecast) = get_data();
-    let mut last_tick = Instant::now();
+    let weather_data = Arc::new(RwLock::new(get_data()));
+    let rx = start_workers(weather_data.clone(), get_data);
     loop {
-        terminal.draw(|f| ui(f, &observation, &station, &alerts, &forecast))?;
-
-        if let Event::Key(key) = event::read()? {
-            if let KeyCode::Char('q') = key.code {
-                return Ok(());
-            }
+        if let Ok(data) = weather_data.read() {
+            terminal.draw(|f| ui(f, &data.0, &data.1, &data.2, &data.3))?;
         }
 
-        if last_tick.elapsed() >= Duration::from_millis(1000) {
-            last_tick = Instant::now();
-            (observation, station, alerts, forecast) = get_data();
+        match rx.recv().unwrap() {
+            AppEvent::Redraw => (),
+            AppEvent::Exit => return Ok(()),
         }
     }
+}
+
+enum AppEvent {
+    Redraw,
+    Exit,
+}
+
+fn start_workers(
+    weather_data: Arc<RwLock<WeatherData>>,
+    get_data: fn() -> WeatherData,
+) -> Receiver<AppEvent> {
+    let (tx, rx) = mpsc::channel();
+
+    // Web request worker.
+    let web_tx = tx.clone();
+    thread::spawn(move || loop {
+        thread::sleep(Duration::from_secs(10));
+        let data = get_data();
+        if let Ok(mut wdat) = weather_data.write() {
+            *wdat = data;
+        }
+        _ = web_tx.send(AppEvent::Redraw);
+    });
+
+    // Handle TUI events.
+    let event_tx = tx.clone();
+    thread::spawn(move || loop {
+        match event::read().unwrap() {
+            Event::Key(key) => {
+                if let KeyCode::Char('q') = key.code {
+                    _ = event_tx.send(AppEvent::Exit);
+                }
+            }
+            Event::Resize(_, _) => {
+                _ = event_tx.send(AppEvent::Redraw);
+            }
+            _ => (),
+        }
+    });
+
+    rx
 }
 
 fn display_forecast(conditions: &forecast::Results) -> Vec<Spans> {
