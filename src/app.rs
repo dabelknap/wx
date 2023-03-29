@@ -299,7 +299,7 @@ fn ui<B: Backend>(
 
     let chunks = Layout::default()
         .direction(Direction::Horizontal)
-        .constraints([Constraint::Percentage(50), Constraint::Percentage(50)].as_ref())
+        .constraints([Constraint::Length(60), Constraint::Percentage(100)].as_ref())
         .split(vert_layout[1]);
 
     let lchunks = Layout::default()
