@@ -23,7 +23,9 @@ pub mod station {
     #[derive(Deserialize, Debug)]
     pub struct Properties {
         pub name: String,
+
         pub forecast: String,
+
         #[serde(rename = "stationIdentifier")]
         pub station_identifier: String,
     }
@@ -58,14 +60,20 @@ pub mod observation {
     pub struct Properties {
         #[serde(rename = "textDescription")]
         pub description: String,
+
         pub timestamp: String,
+
         pub temperature: Value<Option<f32>>,
+
         #[serde(rename = "windChill")]
         pub wind_chill: Value<Option<f32>>,
+
         #[serde(rename = "windDirection")]
         pub wind_direction: Value<Option<f32>>,
+
         #[serde(rename = "windSpeed")]
         pub wind_speed: Value<Option<f32>>,
+
         #[serde(rename = "relativeHumidity")]
         pub relative_humidity: Value<Option<f32>>,
     }
@@ -120,9 +128,12 @@ pub mod forecast {
     #[derive(Deserialize, Debug)]
     pub struct Results {
         pub name: Option<String>,
+
         #[serde(rename = "startTime")]
         pub start_time: Option<String>,
+
         pub temperature: Option<f32>,
+
         #[serde(rename = "shortForecast")]
         pub short_forecast: Option<String>,
     }
