@@ -1,6 +1,10 @@
-use crossterm::event::{self, Event, KeyCode};
 use std::io;
+use std::sync::{mpsc, mpsc::Receiver, Arc, RwLock};
+use std::thread;
 use std::time::Duration;
+
+use chrono::{DateTime, Local};
+use crossterm::event::{self, Event, KeyCode};
 use tui::{
     backend::Backend,
     layout::{Alignment, Constraint, Direction, Layout},
@@ -17,10 +21,6 @@ use crate::noaa::station;
 use crate::units::direction::degree_to_compass;
 use crate::units::speed::kph2mph;
 use crate::units::temperature::c2f;
-use std::sync::{mpsc, mpsc::Receiver, Arc, RwLock};
-use std::thread;
-
-use chrono::{DateTime, Local};
 
 const MISSING: &str = "--";
 
@@ -33,10 +33,11 @@ type WeatherData = (
 
 pub fn run_app<B: Backend>(
     terminal: &mut Terminal<B>,
-    get_data: fn() -> WeatherData,
+    station: &str,
+    get_data: fn(&str) -> WeatherData,
 ) -> io::Result<()> {
-    let weather_data = Arc::new(RwLock::new(get_data()));
-    let rx = start_workers(weather_data.clone(), get_data);
+    let weather_data = Arc::new(RwLock::new(get_data(station)));
+    let rx = start_workers(weather_data.clone(), station, get_data);
     loop {
         if let Ok(data) = weather_data.read() {
             terminal.draw(|f| ui(f, &data.0, &data.1, &data.2, &data.3))?;
@@ -56,15 +57,17 @@ enum AppEvent {
 
 fn start_workers(
     weather_data: Arc<RwLock<WeatherData>>,
-    get_data: fn() -> WeatherData,
+    station: &str,
+    get_data: fn(&str) -> WeatherData,
 ) -> Receiver<AppEvent> {
     let (tx, rx) = mpsc::channel();
 
     // Web request worker.
     let web_tx = tx.clone();
+    let station = station.to_owned();
     thread::spawn(move || loop {
         thread::sleep(Duration::from_secs(10));
-        let data = get_data();
+        let data = get_data(&station);
         if let Ok(mut wdat) = weather_data.write() {
             *wdat = data;
         }
@@ -322,7 +325,7 @@ fn ui<B: Backend>(
         list_items.push(ListItem::new(format!("\n  {MISSING}")));
     } else {
         for alert in &alerts.features {
-            list_items.push(ListItem::new(display_alert(&alert)));
+            list_items.push(ListItem::new(display_alert(alert)));
         }
     }
     let alert_list = List::new(list_items).block(alert_block);

@@ -1,4 +1,5 @@
 pub mod temperature {
+    #[allow(unused)]
     pub fn f2c(temp_f: f32) -> f32 {
         (temp_f - 32.0) * 5.0 / 9.0
     }
@@ -23,6 +24,7 @@ pub mod speed {
         kph / KPM
     }
 
+    #[expect(unused)]
     pub fn mph2kph(mph: f32) -> f32 {
         mph * KPM
     }

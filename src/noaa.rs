@@ -1,7 +1,8 @@
+use std::default::Default;
+
 use chrono::{DateTime, Local};
 use reqwest::blocking::{Client, Response};
 use serde::Deserialize;
-use std::default::Default;
 
 const BASE_URL: &str = "https://api.weather.gov/";
 
@@ -11,6 +12,8 @@ pub mod station {
     #[derive(Deserialize, Debug, Default)]
     pub struct Station {
         pub properties: Properties,
+
+        geometry: Geometry,
     }
 
     impl Station {
@@ -18,13 +21,29 @@ pub mod station {
             let url = format!("{BASE_URL}/stations/{station_id}");
             get_web_json(&url)?.error_for_status()?.json()
         }
+
+        pub fn coordinates(&self) -> (f32, f32) {
+            let lat = self.geometry.coordinates.1;
+            let lon = self.geometry.coordinates.0;
+            (lat, lon)
+        }
+
+        pub fn zone_id(&self) -> &str {
+            let tokens: Vec<_> = self.properties.forecast.split("/").collect();
+            tokens.last().unwrap()
+        }
+    }
+
+    #[derive(Deserialize, Debug, Default)]
+    pub struct Geometry {
+        coordinates: (f32, f32),
     }
 
     #[derive(Deserialize, Debug)]
     pub struct Properties {
         pub name: String,
 
-        pub forecast: String,
+        forecast: String,
 
         #[serde(rename = "stationIdentifier")]
         pub station_identifier: String,
@@ -105,6 +124,31 @@ pub mod observation {
     }
 }
 
+pub mod gridpoints {
+    use super::*;
+
+    #[derive(Deserialize, Debug, Default)]
+    pub struct Properties {
+        forecast: String,
+    }
+
+    #[derive(Deserialize, Debug, Default)]
+    pub struct Gridpoints {
+        properties: Properties,
+    }
+
+    impl Gridpoints {
+        pub fn from_coord(lat: f32, lon: f32) -> Result<Self, reqwest::Error> {
+            let url = format!("{BASE_URL}points/{lat},{lon}");
+            get_web_json(&url)?.error_for_status()?.json()
+        }
+
+        pub fn forecast_url(&self) -> &str {
+            &self.properties.forecast
+        }
+    }
+}
+
 pub mod forecast {
     use super::*;
 
@@ -114,9 +158,8 @@ pub mod forecast {
     }
 
     impl Forecast {
-        pub fn from_noaa() -> Result<Self, reqwest::Error> {
-            let url = format!("{}/gridpoints/MKX/37,64/forecast", BASE_URL);
-            get_web_json(&url)?.error_for_status()?.json()
+        pub fn from_noaa(url: &str) -> Result<Self, reqwest::Error> {
+            get_web_json(url)?.error_for_status()?.json()
         }
     }
 
@@ -128,9 +171,6 @@ pub mod forecast {
     #[derive(Deserialize, Debug)]
     pub struct Results {
         pub name: Option<String>,
-
-        #[serde(rename = "startTime")]
-        pub start_time: Option<String>,
 
         pub temperature: Option<f32>,
 
@@ -144,14 +184,12 @@ pub mod alerts {
 
     #[derive(Deserialize, Debug, Default)]
     pub struct Alerts {
-        pub title: String,
-        pub updated: String,
         pub features: Vec<Feature>,
     }
 
     impl Alerts {
-        pub fn from_noaa() -> Result<Self, reqwest::Error> {
-            let url = format!("{}/alerts/active/zone/{}", BASE_URL, "WIZ063");
+        pub fn from_noaa(zone_id: &str) -> Result<Self, reqwest::Error> {
+            let url = format!("{BASE_URL}/alerts/active/zone/{zone_id}");
             get_web_json(&url)?.error_for_status()?.json()
         }
     }
@@ -165,7 +203,6 @@ pub mod alerts {
     pub struct Properties {
         pub severity: String,
         pub certainty: String,
-        pub urgency: String,
         pub event: String,
         pub onset: String,
         pub ends: String,
