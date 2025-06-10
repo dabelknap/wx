@@ -1,4 +1,8 @@
-use std::{error::Error, io};
+use std::env;
+use std::fs::{create_dir, read_to_string, OpenOptions};
+use std::path::PathBuf;
+use std::sync::LazyLock;
+use std::{error::Error, io, io::Write};
 
 use clap::Parser;
 use crossterm::{
@@ -19,18 +23,35 @@ mod noaa;
 mod units;
 
 const ABOUT: &str = "NOAA weather TUI";
+
 const LONG_ABOUT: &str = "
 TUI for viewing weather data sourced from NOAA.
 
 The user supplies the identifier for their NOAA station (e.g. KC29, KMSN, KELP,
 etc.). You can find your station identifier by checking your local weather on
-\"https://noaa.gov\".";
+https://noaa.gov.
+
+The weather station is saved, so subsequent runs of `wx` will use the last
+station unless otherwise specified.
+";
+
+const CACHE_FILE: &str = "station";
+
+#[cfg(target_os = "macos")]
+static CACHE_PATH: LazyLock<Option<PathBuf>> = LazyLock::new(|| {
+    let home = env::var("HOME").ok()?;
+    let mut path = PathBuf::new();
+    path.push(home);
+    path.push("Library/Application Support/WX");
+    path.push(CACHE_FILE);
+    Some(path)
+});
 
 #[derive(Parser, Debug)]
 #[command(version, about=ABOUT, long_about = LONG_ABOUT)]
 struct Args {
     #[arg(help = "NOAA weather station identifier (e.g. KMSN, KELP, etc.)")]
-    station: String,
+    station: Option<String>,
 }
 
 fn get_weather_data(station: &str) -> (Observation, Station, Alerts, Forecast) {
@@ -43,8 +64,41 @@ fn get_weather_data(station: &str) -> (Observation, Station, Alerts, Forecast) {
     (obs, stat, alert, forecast)
 }
 
+fn get_station_from_cache() -> Option<String> {
+    if let Some(ref path) = *CACHE_PATH {
+        read_to_string(path).ok()
+    } else {
+        None
+    }
+}
+
+fn cache_station(station: &str) -> Option<()> {
+    if let Some(ref path) = *CACHE_PATH {
+        let dir = path.parent()?;
+        if !dir.exists() {
+            create_dir(dir).ok()?;
+        }
+        let mut file = OpenOptions::new()
+            .truncate(true)
+            .create(true)
+            .write(true)
+            .open(path)
+            .ok()?;
+        file.write_all(station.as_bytes()).ok()?;
+    }
+    Some(())
+}
+
 fn main() -> Result<(), Box<dyn Error>> {
     let args = Args::parse();
+
+    let station = if let Some(station) = args.station {
+        station
+    } else if let Some(station) = get_station_from_cache() {
+        station
+    } else {
+        return Err("Specify weather station identifier.".into());
+    };
 
     // setup terminal
     enable_raw_mode()?;
@@ -54,7 +108,9 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut terminal = Terminal::new(backend)?;
 
     // create app and run it
-    let res = run_app(&mut terminal, &args.station, get_weather_data);
+    let res = run_app(&mut terminal, &station, get_weather_data);
+
+    cache_station(&station);
 
     // restore terminal
     disable_raw_mode()?;
