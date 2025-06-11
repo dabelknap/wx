@@ -13,27 +13,16 @@ use crossterm::{
 use tui::{backend::CrosstermBackend, Terminal};
 
 use crate::app::run_app;
+use crate::cli::Args;
 use crate::noaa::{
     alerts::Alerts, forecast::Forecast, gridpoints::Gridpoints, observation::Observation,
     station::Station,
 };
 
 mod app;
+mod cli;
 mod noaa;
 mod units;
-
-const ABOUT: &str = "NOAA weather TUI";
-
-const LONG_ABOUT: &str = "
-TUI for viewing weather data sourced from NOAA.
-
-The user supplies the identifier for their NOAA station (e.g. KC29, KMSN, KELP,
-etc.). You can find your station identifier by checking your local weather on
-https://noaa.gov.
-
-The weather station is saved, so subsequent runs of `wx` will use the last
-station unless otherwise specified.
-";
 
 const CACHE_FILE: &str = "station";
 
@@ -46,13 +35,6 @@ static CACHE_PATH: LazyLock<Option<PathBuf>> = LazyLock::new(|| {
     path.push(CACHE_FILE);
     Some(path)
 });
-
-#[derive(Parser, Debug)]
-#[command(version, about=ABOUT, long_about = LONG_ABOUT)]
-struct Args {
-    #[arg(help = "NOAA weather station identifier (e.g. KMSN, KELP, etc.)")]
-    station: Option<String>,
-}
 
 fn get_weather_data(station: &str) -> (Observation, Station, Alerts, Forecast) {
     let obs = Observation::from_station(station).unwrap_or_default();
