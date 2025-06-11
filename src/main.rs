@@ -36,6 +36,16 @@ static CACHE_PATH: LazyLock<Option<PathBuf>> = LazyLock::new(|| {
     Some(path)
 });
 
+#[cfg(target_os = "linux")]
+static CACHE_PATH: LazyLock<Option<PathBuf>> = LazyLock::new(|| {
+    let home = env::var("HOME").ok()?;
+    let mut path = PathBuf::new();
+    path.push(home);
+    path.push(".local/state/wx");
+    path.push(CACHE_FILE);
+    Some(path)
+});
+
 fn get_weather_data(station: &str) -> (Observation, Station, Alerts, Forecast) {
     let obs = Observation::from_station(station).unwrap_or_default();
     let stat = Station::from_station(station).unwrap_or_default();
