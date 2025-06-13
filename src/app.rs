@@ -1,5 +1,5 @@
 use std::io;
-use std::sync::{mpsc, mpsc::Receiver, Arc, RwLock};
+use std::sync::{mpsc, mpsc::Receiver, Arc, Mutex};
 use std::thread;
 use std::time::Duration;
 
@@ -36,16 +36,29 @@ pub fn run_app<B: Backend>(
     station: &str,
     get_data: fn(&str) -> WeatherData,
 ) -> io::Result<()> {
-    let weather_data = Arc::new(RwLock::new(get_data(station)));
+    let weather_data = Arc::new(Mutex::new(None));
     let rx = start_workers(weather_data.clone(), station, get_data);
+    let mut loading_counter: usize = 0;
     loop {
-        if let Ok(data) = weather_data.read() {
+        let data = weather_data.lock().unwrap();
+        if let Some(ref data) = *data {
             terminal.draw(|f| ui(f, &data.0, &data.1, &data.2, &data.3))?;
-        }
 
-        match rx.recv().unwrap() {
-            AppEvent::Redraw => (),
-            AppEvent::Exit => return Ok(()),
+            match rx.recv().unwrap() {
+                AppEvent::Redraw => (),
+                AppEvent::Exit => return Ok(()),
+            }
+        } else {
+            drop(data); // If we don't have data to read, drop the lock so we don't stop the worker
+                        // from updating.
+            terminal.draw(|f| loading(f, loading_counter))?;
+            loading_counter += 1;
+            thread::sleep(Duration::from_millis(250));
+            match rx.try_recv() {
+                Ok(AppEvent::Redraw) | Err(mpsc::TryRecvError::Empty) => (),
+                Ok(AppEvent::Exit) => return Ok(()),
+                _ => panic!("Thread crashed"),
+            }
         }
     }
 }
@@ -56,7 +69,7 @@ enum AppEvent {
 }
 
 fn start_workers(
-    weather_data: Arc<RwLock<WeatherData>>,
+    weather_data: Arc<Mutex<Option<WeatherData>>>,
     station: &str,
     get_data: fn(&str) -> WeatherData,
 ) -> Receiver<AppEvent> {
@@ -66,12 +79,10 @@ fn start_workers(
     let web_tx = tx.clone();
     let station = station.to_owned();
     thread::spawn(move || loop {
-        thread::sleep(Duration::from_secs(10));
         let data = get_data(&station);
-        if let Ok(mut wdat) = weather_data.write() {
-            *wdat = data;
-        }
+        weather_data.lock().unwrap().replace(data);
         _ = web_tx.send(AppEvent::Redraw);
+        thread::sleep(Duration::from_secs(10));
     });
 
     // Handle TUI events.
@@ -279,6 +290,29 @@ fn display_headline<'a>(
             .border_style(Style::default().fg(Color::Cyan))
             .border_type(BorderType::Rounded),
     )
+}
+
+fn loading<B: Backend>(f: &mut Frame<B>, idx: usize) {
+    let text = match idx % 4 {
+        0 => "Loading",
+        1 => "Loading.",
+        2 => "Loading..",
+        3 => "Loading...",
+        _ => unreachable!(),
+    };
+    let widget = Paragraph::new(text)
+        .alignment(Alignment::Left)
+        .block(Block::default().borders(Borders::NONE));
+    let vert_layout = Layout::default()
+        .direction(Direction::Vertical)
+        .margin(1)
+        .constraints([Constraint::Percentage(45), Constraint::Percentage(55)])
+        .split(f.size());
+    let horiz_layout = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
+        .split(vert_layout[1]);
+    f.render_widget(widget, horiz_layout[1]);
 }
 
 fn ui<B: Backend>(
