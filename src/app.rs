@@ -53,7 +53,7 @@ pub fn run_app<B: Backend>(
                         // from updating.
             terminal.draw(|f| loading(f, loading_counter))?;
             loading_counter += 1;
-            thread::sleep(Duration::from_millis(250));
+            thread::sleep(Duration::from_millis(100));
             match rx.try_recv() {
                 Ok(AppEvent::Redraw) | Err(mpsc::TryRecvError::Empty) => (),
                 Ok(AppEvent::Exit) => return Ok(()),
@@ -293,14 +293,18 @@ fn display_headline<'a>(
 }
 
 fn loading<B: Backend>(f: &mut Frame<B>, idx: usize) {
-    let text = match idx % 4 {
-        0 => "Loading",
-        1 => "Loading.",
-        2 => "Loading..",
-        3 => "Loading...",
+    let spinner = match idx % 8 {
+        0 => "⣾",
+        1 => "⣽",
+        2 => "⣻",
+        3 => "⢿",
+        4 => "⡿",
+        5 => "⣟",
+        6 => "⣯",
+        7 => "⣷",
         _ => unreachable!(),
     };
-    let widget = Paragraph::new(text)
+    let widget = Paragraph::new(format!("Loading {spinner}"))
         .alignment(Alignment::Left)
         .block(Block::default().borders(Borders::NONE));
     let vert_layout = Layout::default()
