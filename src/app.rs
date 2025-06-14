@@ -5,11 +5,11 @@ use std::time::Duration;
 
 use chrono::{DateTime, Local};
 use crossterm::event::{self, Event, KeyCode};
-use tui::{
+use ratatui::{
     backend::Backend,
     layout::{Alignment, Constraint, Direction, Layout},
     style::{Color, Modifier, Style},
-    text::{Span, Spans},
+    text::{Line, Span},
     widgets::{Block, BorderType, Borders, Cell, List, ListItem, Paragraph, Row, Table},
     Frame, Terminal,
 };
@@ -104,15 +104,15 @@ fn start_workers(
     rx
 }
 
-fn display_forecast(conditions: &forecast::Results) -> Vec<Spans> {
-    let mut spans = vec![Spans::from("")];
+fn display_forecast(conditions: &forecast::Results) -> Vec<Line> {
+    let mut spans = vec![Line::from("")];
 
     let name = if let Some(ref name) = conditions.name {
         name.clone()
     } else {
         MISSING.to_string()
     };
-    spans.push(Spans::from(vec![
+    spans.push(Line::from(vec![
         Span::raw(" "),
         Span::styled(
             name,
@@ -127,7 +127,7 @@ fn display_forecast(conditions: &forecast::Results) -> Vec<Spans> {
     } else {
         MISSING.to_string()
     };
-    spans.push(Spans::from(vec![
+    spans.push(Line::from(vec![
         Span::raw(format!(" {:13}", "Temperature")),
         Span::styled(temp, Style::default().fg(Color::Green)),
     ]));
@@ -137,26 +137,26 @@ fn display_forecast(conditions: &forecast::Results) -> Vec<Spans> {
     } else {
         MISSING.to_string()
     };
-    spans.push(Spans::from(vec![
+    spans.push(Line::from(vec![
         Span::raw(format!(" {:13}", "Conditions")),
         Span::styled(text, Style::default().fg(Color::Green)),
     ]));
     spans
 }
 
-fn display_alert(alert: &alerts::Feature) -> Vec<Spans> {
+fn display_alert(alert: &alerts::Feature) -> Vec<Line> {
     let onset: DateTime<Local> =
         DateTime::from(DateTime::parse_from_rfc3339(&alert.properties.onset).unwrap());
     let ends: DateTime<Local> =
         DateTime::from(DateTime::parse_from_rfc3339(&alert.properties.ends).unwrap());
     vec![
-        Spans::from(""),
-        Spans::from(vec![
+        Line::from(""),
+        Line::from(vec![
             Span::raw(" "),
             Span::raw(format!("{:10}", "Event")),
             Span::styled(&alert.properties.event, Style::default().fg(Color::Green)),
         ]),
-        Spans::from(vec![
+        Line::from(vec![
             Span::raw(" "),
             Span::raw(format!("{:10}", "Severity")),
             Span::styled(
@@ -164,7 +164,7 @@ fn display_alert(alert: &alerts::Feature) -> Vec<Spans> {
                 Style::default().fg(Color::Green),
             ),
         ]),
-        Spans::from(vec![
+        Line::from(vec![
             Span::raw(" "),
             Span::raw(format!("{:10}", "Certainty")),
             Span::styled(
@@ -172,7 +172,7 @@ fn display_alert(alert: &alerts::Feature) -> Vec<Spans> {
                 Style::default().fg(Color::Green),
             ),
         ]),
-        Spans::from(vec![
+        Line::from(vec![
             Span::raw(" "),
             Span::raw(format!("{:10}", "Onset")),
             Span::styled(
@@ -180,7 +180,7 @@ fn display_alert(alert: &alerts::Feature) -> Vec<Spans> {
                 Style::default().fg(Color::Green),
             ),
         ]),
-        Spans::from(vec![
+        Line::from(vec![
             Span::raw(" "),
             Span::raw(format!("{:10}", "Ends")),
             Span::styled(
@@ -261,9 +261,7 @@ fn display_current_conditions(current: &observation::Properties) -> Table {
         Cell::from(text).style(Style::default().fg(Color::Green)),
     ]));
 
-    Table::new(rows)
-        .block(current_block)
-        .widths(&[Constraint::Length(12), Constraint::Length(25)])
+    Table::new(rows, [Constraint::Length(12), Constraint::Length(25)]).block(current_block)
 }
 
 fn display_headline<'a>(
@@ -273,7 +271,7 @@ fn display_headline<'a>(
     let date: DateTime<Local> =
         DateTime::from(DateTime::parse_from_rfc3339(&observation.timestamp).unwrap());
     Paragraph::new(vec![
-        Spans::from(vec![
+        Line::from(vec![
             Span::raw(" "),
             Span::styled(
                 station.station_identifier.clone(),
@@ -282,7 +280,7 @@ fn display_headline<'a>(
             Span::raw(" : "),
             Span::styled(station.name.clone(), Style::default().fg(Color::Yellow)),
         ]),
-        Spans::from(format!(" {}", date.format("%d-%m-%Y %H:%M"))),
+        Line::from(format!(" {}", date.format("%d-%m-%Y %H:%M"))),
     ])
     .block(
         Block::default()
@@ -292,7 +290,7 @@ fn display_headline<'a>(
     )
 }
 
-fn loading<B: Backend>(f: &mut Frame<B>, idx: usize) {
+fn loading(f: &mut Frame, idx: usize) {
     let spinner = match idx % 8 {
         0 => "⣾",
         1 => "⣽",
@@ -311,7 +309,7 @@ fn loading<B: Backend>(f: &mut Frame<B>, idx: usize) {
         .direction(Direction::Vertical)
         .margin(1)
         .constraints([Constraint::Percentage(45), Constraint::Percentage(55)])
-        .split(f.size());
+        .split(f.area());
     let horiz_layout = Layout::default()
         .direction(Direction::Horizontal)
         .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
@@ -319,8 +317,8 @@ fn loading<B: Backend>(f: &mut Frame<B>, idx: usize) {
     f.render_widget(widget, horiz_layout[1]);
 }
 
-fn ui<B: Backend>(
-    f: &mut Frame<B>,
+fn ui(
+    f: &mut Frame,
     current: &observation::Observation,
     station: &station::Station,
     alerts: &alerts::Alerts,
@@ -331,9 +329,9 @@ fn ui<B: Backend>(
         .margin(1)
         .constraints([
             Constraint::Length(4),
-            Constraint::Length(f.size().height - 4),
+            Constraint::Length(f.area().height - 4),
         ])
-        .split(f.size());
+        .split(f.area());
 
     let title_widget = display_headline(&station.properties, &current.properties);
     f.render_widget(title_widget, vert_layout[0]);
